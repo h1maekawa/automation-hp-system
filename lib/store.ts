@@ -4,7 +4,8 @@ import { ProjectRecord } from "@/lib/types";
 const supabaseUrl = process.env.SUPABASE_URL || "";
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || "";
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Initialize only if URL is present to avoid build-time crashes
+const supabase = supabaseUrl ? createClient(supabaseUrl, supabaseKey) : null;
 
 function mapFromDb(record: any): ProjectRecord {
   return {
@@ -47,6 +48,7 @@ function mapToDb(project: Partial<ProjectRecord>) {
 }
 
 export async function listProjects() {
+  if (!supabase) return [];
   const { data, error } = await supabase
     .from("projects")
     .select("*")
@@ -60,6 +62,7 @@ export async function listProjects() {
 }
 
 export async function getProject(id: string) {
+  if (!supabase) return null;
   const { data, error } = await supabase
     .from("projects")
     .select("*")
@@ -71,6 +74,7 @@ export async function getProject(id: string) {
 }
 
 export async function upsertProject(project: Partial<ProjectRecord> & Pick<ProjectRecord, "name" | "category" | "templateId" | "sourceType" | "status">) {
+  if (!supabase) throw new Error("Supabase client not initialized");
   const dbData = mapToDb(project);
   
   if (project.id) {
@@ -98,6 +102,7 @@ export async function createPublishedSlug(projectId: string) {
   if (!project) return null;
 
   const slug = project.slug || Math.random().toString(36).substring(2, 10);
+  if (!supabase) throw new Error("Supabase client not initialized");
   const { data, error } = await supabase
     .from("projects")
     .update({
