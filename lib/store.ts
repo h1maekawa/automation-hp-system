@@ -1,78 +1,114 @@
-import { promises as fs } from "fs";
-import path from "path";
-import crypto from "crypto";
+import { createClient } from "@supabase/supabase-js";
 import { ProjectRecord } from "@/lib/types";
 
-const dataFile = path.join(process.cwd(), "data", "projects.json");
+const supabaseUrl = process.env.SUPABASE_URL || "";
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || "";
 
-async function readAll(): Promise<ProjectRecord[]> {
-  try {
-    const raw = await fs.readFile(dataFile, "utf8");
-    return JSON.parse(raw) as ProjectRecord[];
-  } catch {
-    return [];
-  }
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+function mapFromDb(record: any): ProjectRecord {
+  return {
+    id: record.id,
+    name: record.name,
+    category: record.category,
+    templateId: record.template_id,
+    sourceType: record.source_type,
+    referenceUrl: record.reference_url,
+    siteAnalysis: record.site_analysis,
+    selectedSections: record.selected_sections,
+    shopInfo: record.shop_info,
+    generatedContent: record.generated_content,
+    renderedHtml: record.rendered_html,
+    deployUrl: record.deploy_url,
+    slug: record.slug,
+    status: record.status,
+    createdAt: record.created_at,
+    updatedAt: record.updated_at
+  };
 }
 
-async function writeAll(projects: ProjectRecord[]) {
-  await fs.mkdir(path.dirname(dataFile), { recursive: true });
-  await fs.writeFile(dataFile, JSON.stringify(projects, null, 2), "utf8");
+function mapToDb(project: Partial<ProjectRecord>) {
+  const data: any = {};
+  if (project.name !== undefined) data.name = project.name;
+  if (project.category !== undefined) data.category = project.category;
+  if (project.templateId !== undefined) data.template_id = project.templateId;
+  if (project.sourceType !== undefined) data.source_type = project.sourceType;
+  if (project.referenceUrl !== undefined) data.reference_url = project.referenceUrl;
+  if (project.siteAnalysis !== undefined) data.site_analysis = project.siteAnalysis;
+  if (project.selectedSections !== undefined) data.selected_sections = project.selectedSections;
+  if (project.shopInfo !== undefined) data.shop_info = project.shopInfo;
+  if (project.generatedContent !== undefined) data.generated_content = project.generatedContent;
+  if (project.renderedHtml !== undefined) data.rendered_html = project.renderedHtml;
+  if (project.deployUrl !== undefined) data.deploy_url = project.deployUrl;
+  if (project.slug !== undefined) data.slug = project.slug;
+  if (project.status !== undefined) data.status = project.status;
+  data.updated_at = new Date().toISOString();
+  return data;
 }
 
 export async function listProjects() {
-  const projects = await readAll();
-  return projects.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+  const { data, error } = await supabase
+    .from("projects")
+    .select("*")
+    .order("updated_at", { ascending: false });
+  
+  if (error) {
+    console.error("Supabase error:", error);
+    return [];
+  }
+  return (data || []).map(mapFromDb);
 }
 
 export async function getProject(id: string) {
-  const projects = await readAll();
-  return projects.find((project) => project.id === id) ?? null;
+  const { data, error } = await supabase
+    .from("projects")
+    .select("*")
+    .eq("id", id)
+    .single();
+  
+  if (error || !data) return null;
+  return mapFromDb(data);
 }
 
 export async function upsertProject(project: Partial<ProjectRecord> & Pick<ProjectRecord, "name" | "category" | "templateId" | "sourceType" | "status">) {
-  const projects = await readAll();
-  const now = new Date().toISOString();
-  const existingIndex = project.id ? projects.findIndex((item) => item.id === project.id) : -1;
-  const record: ProjectRecord = {
-    id: project.id || crypto.randomUUID(),
-    name: project.name,
-    category: project.category,
-    templateId: project.templateId,
-    sourceType: project.sourceType,
-    referenceUrl: project.referenceUrl,
-    siteAnalysis: project.siteAnalysis,
-    selectedSections: project.selectedSections,
-    shopInfo: project.shopInfo,
-    generatedContent: project.generatedContent,
-    renderedHtml: project.renderedHtml,
-    deployUrl: project.deployUrl,
-    slug: project.slug,
-    status: project.status,
-    createdAt: existingIndex >= 0 ? projects[existingIndex].createdAt : now,
-    updatedAt: now
-  };
-
-  if (existingIndex >= 0) {
-    projects[existingIndex] = { ...projects[existingIndex], ...record, updatedAt: now };
+  const dbData = mapToDb(project);
+  
+  if (project.id) {
+    const { data, error } = await supabase
+      .from("projects")
+      .update(dbData)
+      .eq("id", project.id)
+      .select()
+      .single();
+    if (error) throw error;
+    return mapFromDb(data);
   } else {
-    projects.push(record);
+    const { data, error } = await supabase
+      .from("projects")
+      .insert({ ...dbData, created_at: new Date().toISOString() })
+      .select()
+      .single();
+    if (error) throw error;
+    return mapFromDb(data);
   }
-
-  await writeAll(projects);
-  return record;
 }
 
 export async function createPublishedSlug(projectId: string) {
-  const projects = await readAll();
-  const index = projects.findIndex((item) => item.id === projectId);
-  if (index < 0) return null;
-  const slug = projects[index].slug || crypto.randomBytes(4).toString("hex");
-  projects[index] = {
-    ...projects[index],
-    slug,
-    status: "deployed",
-    updatedAt: new Date().toISOString()
-  };
-  await writeAll(projects);
-  return projects[index];
+  const project = await getProject(projectId);
+  if (!project) return null;
+
+  const slug = project.slug || Math.random().toString(36).substring(2, 10);
+  const { data, error } = await supabase
+    .from("projects")
+    .update({
+      slug,
+      status: "deployed",
+      updated_at: new Date().toISOString()
+    })
+    .eq("id", projectId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return mapFromDb(data);
 }
