@@ -33,6 +33,7 @@ export interface TemplateDefinition {
   description: string;
   previewTitle: string;
   thumbnailGradient: string;
+  referenceUrl?: string;
   html: string;
   variables: string[];
   sampleAnalysis: SiteAnalysis;

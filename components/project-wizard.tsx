@@ -45,8 +45,8 @@ type SourceType = "gallery" | "external-url" | "screenshot";
 export function ProjectWizard({ initialProject }: { initialProject?: ProjectRecord | null }) {
   const [currentStep, setCurrentStep] = useState(1);
   const [projectId, setProjectId] = useState<string | undefined>(initialProject?.id);
-  const [category, setCategory] = useState(initialProject?.category || "restaurant");
-  const [templateId, setTemplateId] = useState(initialProject?.templateId || "restaurant-luxury-01");
+  const [category, setCategory] = useState(initialProject?.category || "izakaya-washoku");
+  const [templateId, setTemplateId] = useState(initialProject?.templateId || "izakaya-utaya");
   const [sourceType, setSourceType] = useState<SourceType>(initialProject?.sourceType || "gallery");
   const [referenceUrl, setReferenceUrl] = useState(initialProject?.referenceUrl || "");
   const [urlModalOpen, setUrlModalOpen] = useState(false);
@@ -286,17 +286,20 @@ export function ProjectWizard({ initialProject }: { initialProject?: ProjectReco
             <Card className="p-6">
               <SectionTitle title="STEP1: テンプレート選択" description="カテゴリからテンプレートを選ぶか、外部URL/スクリーンショットを参照元にできます。" />
               <div className="grid gap-6">
-                <div>
-                  <Label>業種カテゴリ</Label>
-                  <div className="grid gap-3 md:grid-cols-3">
+                <div className="mb-6">
+                  <div className="mb-4 flex flex-wrap gap-2">
                     {categories.industry.map((item) => (
                       <button
                         key={item.id}
                         onClick={() => setCategory(item.id)}
-                        className={`rounded-2xl border p-4 text-left ${category === item.id ? "border-primary bg-bgSecondary" : "border-black/10 bg-white"}`}
+                        className={`flex items-center gap-2 rounded-full px-5 py-2 text-sm font-medium transition-all ${
+                          category === item.id 
+                          ? "bg-primary text-white shadow-lg shadow-primary/20" 
+                          : "bg-white text-secondary border border-black/5 hover:bg-bgSecondary"
+                        }`}
                       >
-                        <div className="text-2xl">{item.icon}</div>
-                        <div className="mt-2 font-semibold">{item.label}</div>
+                        <span>{item.icon}</span>
+                        <span>{item.label}</span>
                       </button>
                     ))}
                   </div>
@@ -307,20 +310,53 @@ export function ProjectWizard({ initialProject }: { initialProject?: ProjectReco
                   <Button variant="secondary" onClick={() => setUploadModalOpen(true)}>スクリーンショットを添付</Button>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {filteredTemplates.map((item) => (
-                    <TemplateCard
-                      key={item.id}
-                      title={item.name}
-                      subtitle={item.description}
-                      tags={item.tags}
-                      gradient={item.thumbnailGradient}
-                      selected={templateId === item.id}
+                    <div 
+                      key={item.id} 
+                      className={`group relative cursor-pointer overflow-hidden rounded-3xl border-2 transition-all ${
+                        templateId === item.id ? "border-primary ring-4 ring-primary/10" : "border-transparent bg-white hover:border-black/5"
+                      }`}
                       onClick={() => {
                         setSourceType("gallery");
                         setTemplateId(item.id);
+                        if (item.referenceUrl) setReferenceUrl(item.referenceUrl);
                       }}
-                    />
+                    >
+                      <div className="aspect-[4/3] w-full p-1">
+                        <div className="relative h-full w-full overflow-hidden rounded-2xl" style={{ background: item.thumbnailGradient }}>
+                          {/* 背景にiframeを少しだけ見せる、またはロゴを配置するなどの演出が可能 */}
+                          <div className="flex h-full items-center justify-center text-center p-6 bg-black/10">
+                            <span className="text-sm font-bold text-white leading-tight">
+                              {item.previewTitle}<br/>
+                              <span className="text-[10px] font-normal opacity-70">構造・デザインを再現</span>
+                            </span>
+                          </div>
+                          {item.referenceUrl && (
+                            <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <a 
+                                href={item.referenceUrl} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="rounded-full bg-white/20 backdrop-blur-md px-3 py-1 text-[10px] text-white border border-white/30"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                サイトを見る ↗
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="p-4">
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-bold text-primary">{item.name}</h3>
+                        </div>
+                        <p className="mt-1 text-xs text-secondary line-clamp-2">{item.description}</p>
+                        <div className="mt-3 flex flex-wrap gap-1">
+                          {item.tags.map(tag => <span key={tag} className="text-[10px] bg-bgSecondary px-2 py-0.5 rounded-full text-tertiary">#{tag}</span>)}
+                        </div>
+                      </div>
+                    </div>
                   ))}
                 </div>
 
